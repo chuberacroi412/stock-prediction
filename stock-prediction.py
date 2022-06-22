@@ -264,10 +264,12 @@ import random
 
 # from here
 # Data
-symbol = yf.Ticker('BTC-USD')
-df = pd.read_csv('./NSE-TATA.csv')
-df = df.iloc[::-1]
-df['Date'] = pd.to_datetime(df['Date'])
+# symbol = yf.Ticker('BTC-USD')
+# df = pd.read_csv('./NSE-TATA.csv')
+# df = df.iloc[::-1]
+df = yf.download(tickers='BTC-USD', period='1d', interval='1m')
+
+# df['Date'] = pd.to_datetime(df['Date'])
 df['20wma'] = df['Close'].rolling(window=140).mean()
 df['std'] = df['Close'].rolling(window=140).mean()
 
@@ -286,18 +288,18 @@ avg_down = change_down.rolling(14).mean().abs()
 rsi = 100 * avg_up /(avg_up + avg_down)
 
 # fig - canlde stick
-fig = go.Figure(data = [go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
+fig = go.Figure(data = [go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
 
 # fig - close price
-fig.add_trace(go.Scatter(x=df['Date'], y =df['Close'], line=dict(color='blue'), name='Close'))
+fig.add_trace(go.Scatter(x=df.index, y =df['Close'], line=dict(color='blue'), name='Close'))
 
 # fig - moving avg
 # fig.add_trace(go.Scatter(x=df['Date'], y = df['20wma'], line=dict(color='yellow'), name='20 Week moving avg'))
 
 # upper bolling band
-fig.add_trace(go.Scatter(x=df['Date'], y=df['20wma'] + (df['std'] * 2), line_color = 'gray', name='upper band', opacity=0.5))
+fig.add_trace(go.Scatter(x=df.index, y=df['20wma'] + (df['std'] * 2), line_color = 'gray', name='upper band', opacity=0.5))
 # lower bolling band
-fig.add_trace(go.Scatter(x=df['Date'], y=df['20wma'] - (df['std'] * 2), line_color = 'gray', name='lower band', opacity=0.5))
+fig.add_trace(go.Scatter(x=df.index, y=df['20wma'] - (df['std'] * 2), line_color = 'gray', name='lower band', opacity=0.5))
 
 # fig - layout
 fig.update_layout(yaxis_title = 'Price', xaxis_title = 'Date')
@@ -306,18 +308,14 @@ fig.update_yaxes(type='log')
 
 
 # fig2
-fig2 = go.Figure(data = [go.Scatter(x=df['Date'], y=rsi)])
+fig2 = go.Figure(data = [go.Scatter(x=df.index, y=rsi)])
 fig2.add_hline(y=30, line_dash='dash', line_color='green')
 fig2.add_hline(y=70, line_dash='dash', line_color='red')
 
-fig3 = go.Figure(data = [go.Scatter(x=df['Date'], y=df['20wma'] + (df['std'] * 2))])
-fig4 = go.Figure(data = [go.Scatter(x=df['Date'], y=df['20wma'] - (df['std'] * 2))])
+fig3 = go.Figure(data = [go.Scatter(x=df.index, y=df['20wma'] + (df['std'] * 2))])
+fig4 = go.Figure(data = [go.Scatter(x=df.index, y=df['20wma'] - (df['std'] * 2))])
 
-# test live data
-xtest = [1, 2, 3]
-ytest = [1, 3, 2]
-figlive = go.Figure(data=[go.Scatter(x=xtest, y = ytest)])
-figlive2 = go.Figure(data=[go.Scatter(x=ytest, y = xtest)])
+
 
 # display
 app = dash.Dash()
@@ -330,78 +328,53 @@ app.layout = html.Div([
     html.Div(id='prediction-property-selected'),
     html.H4("Stock prediction"),
     dcc.Graph(id='stock_chart', 
-        figure = fig
+        figure = fig,
+        animate=True
     ),  
+    dcc.Interval(id='update_stock_chart',interval=1000*1*60),
     html.Div(
         id='rsi_chart',
         children = [
                 html.H2("RSI chart",style={"textAlign": "center"}),
                 dcc.Graph(
-                figure=fig2
+                figure=fig2,
+                animate=True
             )
         ]
     ),
-    html.Div('test live'),
-    dcc.Graph(id='live',figure=figlive,animate=True),
-    dcc.Interval(id='update-live',interval=1000*1),
-    dcc.Dropdown(['Close', 'Price of Change'], 'Price of Change', id='select-price2'),
+    dcc.Interval(id='update_rsi_chart',interval=1000*1*60)
 ])
 
 @app.callback(Output('stock_chart', 'figure'),
-              [Input('select-property', 'value'), 
+              [Input('update-live','n_intervals'),
+              Input('select-property', 'value'), 
               Input('select-price', 'value')])
 
-def update_graph(selected_dropdown, selected_price):
+def update_graph(n_interval, selected_dropdown, selected_price):
 
-    fig = go.Figure(data = [go.Candlestick(x=df['Date'], open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
+    data = yf.download(tickers='BTC-USD', period='1d', interval='1m')
+    last_row = data.iloc[-1:]
+    df.append(last_row, ignore_index = True)
+    print(df)
+    
+    fig = go.Figure(data = [go.Candlestick(x=df.index, open=df['Open'], high=df['High'], low=df['Low'], close=df['Close'])])
 
     if 'Close' in selected_price:
-        fig = go.Figure(data = [go.Scatter(x=df['Date'], y =df['Close'], line=dict(color='blue'), name='Close')])
+        fig = go.Figure(data = [go.Scatter(x=df.index, y =df['Close'], line=dict(color='blue'), name='Close')])
 
     if 'Moving Average' in selected_dropdown:
-        fig.add_trace(go.Scatter(x=df['Date'], y = df['20wma'], line=dict(color='yellow'), name='20 Week moving avg'))
+        fig.add_trace(go.Scatter(x=df.index, y = df['20wma'], line=dict(color='yellow'), name='20 Week moving avg'))
 
     if 'Bolling Bands' in selected_dropdown:
         # upper bolling band
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['20wma'] + (df['std'] * 2), line_color = 'gray', name='upper band', opacity=0.5))
+        fig.add_trace(go.Scatter(x=df.index, y=df['20wma'] + (df['std'] * 2), line_color = 'gray', name='upper band', opacity=0.5))
         # lower bolling band
-        fig.add_trace(go.Scatter(x=df['Date'], y=df['20wma'] - (df['std'] * 2), line_color = 'gray', fill = 'tonexty', name='lower band', opacity=0.5))
+        fig.add_trace(go.Scatter(x=df.index, y=df['20wma'] - (df['std'] * 2), line_color = 'gray', fill = 'tonexty', name='lower band', opacity=0.5))
+
+    fig.update_layout(xaxis=dict(range=[min(df.index),max(df.index)]),
+                                                yaxis=dict(range=[min(df['Low']),max(df['High'])]))
 
     return fig
-
-@app.callback(Output('rsi_chart', 'style'),
-              [Input('select-property', 'value')])
-
-def update_graph(selected_dropdown):
-    if 'RSI' in selected_dropdown:
-        return {'display':'block'}
-
-    return {'display':'none'}
-
-@app.callback(Output('live', 'figure'),[Input('update-live','n_intervals'), Input('select-price2', 'value')])
-
-def update(n, select):
-    xtest.append(xtest[-1]+1)
-    ytest.append(ytest[-1]+ytest[-1]*random.uniform(-0.1,0.1))
-    figlive = go.Figure(data=[go.Scatter(x=xtest, y = ytest)])
-    figlive.update_layout(xaxis=dict(range=[min(xtest),max(xtest)]),
-                                                yaxis=dict(range=[min(xtest),max(xtest)]))
-
-    if 'Close' == select:
-        figlive.add_trace(go.Scatter(x=ytest, y = xtest))
-
-    return figlive
-
-#        data = plotly.graph_objs.Scatter(
-    #         x=list(xtest),
-    #         y=list(ytest),
-    #         name='Scatter',
-    #         mode= 'lines+markers'
-    #         )
-
-    # return {'data': [data],'layout' : go.Layout(xaxis=dict(range=[min(xtest),max(xtest)]),
-    #                                             yaxis=dict(range=[min(ytest),max(ytest)]),)}
-
 
 if __name__=='__main__':
     app.run_server(debug=True)
