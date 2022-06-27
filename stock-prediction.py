@@ -14,7 +14,7 @@ import numpy as np
 import yfinance as yf
 import matplotlib.pyplot as plt
 
-df = yf.download(tickers='BTC-USD', period='25d', interval='30m')
+df = yf.download(tickers='BTC-USD', period='15d', interval='15m')
 
 # moving avg
 df['20wma'] = df['Close'].rolling(window=140).mean()
@@ -168,7 +168,7 @@ app.layout = html.Div([
     ], style={
         'padding': '20px'
     }), 
-    dcc.Interval(id='update_stock_chart',interval=1000*1*60),
+    dcc.Interval(id='update_stock_chart',interval=1000*15*60),
     html.Div(
         id='rsi_chart',
         children = [
@@ -182,7 +182,7 @@ app.layout = html.Div([
             )
         ]
     ),
-    dcc.Interval(id='update_rsi_chart',interval=1000*1*60)
+    dcc.Interval(id='update_rsi_chart',interval=1000*15*60)
 ])
 
 @app.callback(Output('stock_chart', 'figure'),
